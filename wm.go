@@ -16,6 +16,9 @@ type Wm struct {
 	Windows       map[xproto.Window]*Window
 
 	logger *log.Logger
+
+	NewWindow chan *Window
+	Strokes   chan Stroke
 }
 
 type Window struct {
@@ -26,10 +29,20 @@ type Window struct {
 }
 
 type Config struct {
-	Logger *log.Logger
+	Logger  *log.Logger
+	Strokes []Stroke
+}
+
+type Stroke struct {
+	Modifiers uint16
+	Key       byte
 }
 
 func New(config *Config) (*Wm, error) {
+	if config == nil {
+		config = new(Config)
+	}
+
 	// connect
 	conn, err := xgb.NewConn()
 	if err != nil {
@@ -48,12 +61,23 @@ func New(config *Config) (*Wm, error) {
 			xproto.EventMaskPropertyChange)}).Check(); err != nil {
 		return nil, ef("another wm is running: %v", err)
 	}
-	/*
-		if err := xproto.GrabKeyChecked(conn, true, defaultRootId, xproto.ModMaskAny, xproto.GrabAny,
-			xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
-			return nil, ef("grab key error: %v", err)
+	if err := xproto.UngrabKeyChecked(conn, xproto.GrabAny, defaultRootId, xproto.ModMaskAny).Check(); err != nil {
+		return nil, ef("ungrab keys: %v", err)
+	}
+	ignoreModifiers := []uint16{
+		0,
+		xproto.ModMaskLock,
+		xproto.ModMask2,
+		xproto.ModMaskLock | xproto.ModMask2,
+	}
+	for _, stroke := range config.Strokes {
+		for _, mod := range ignoreModifiers {
+			if err := xproto.GrabKeyChecked(conn, true, defaultRootId, stroke.Modifiers|mod,
+				xproto.Keycode(stroke.Key), xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
+				return nil, ef("grab key: %v", err)
+			}
 		}
-	*/
+	}
 
 	wm := &Wm{
 		Conn:          conn,
@@ -61,9 +85,8 @@ func New(config *Config) (*Wm, error) {
 		DefaultScreen: defaultScreen,
 		DefaultRootId: defaultRootId,
 		Windows:       make(map[xproto.Window]*Window),
-	}
-	if config == nil {
-		config = new(Config)
+		NewWindow:     make(chan *Window),
+		Strokes:       make(chan Stroke),
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
@@ -152,6 +175,13 @@ func (w *Wm) loop() {
 
 			case xproto.MapNotifyEvent:
 
+			case xproto.KeyPressEvent:
+				w.Strokes <- Stroke{
+					Modifiers: ev.State,
+					Key:       byte(ev.Detail),
+				}
+			case xproto.KeyReleaseEvent:
+
 			default:
 				w.pt("NOT HANDLED EVENT: %T %v\n", ev, ev)
 			}
@@ -162,4 +192,5 @@ func (w *Wm) loop() {
 func (w *Wm) addWindow(win *Window) {
 	w.pt("added window %v\n", win.Id)
 	w.Windows[win.Id] = win
+	w.NewWindow <- win
 }

@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"testing"
+
+	"github.com/BurntSushi/xgb/xproto"
 )
 
 var testSigs chan os.Signal
@@ -16,7 +18,11 @@ func TestMain(m *testing.M) {
 }
 
 func TestConnect(t *testing.T) {
-	wm, err := New(nil)
+	wm, err := New(&Config{
+		Strokes: []Stroke{
+			{xproto.ModMaskControl, 41},
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,5 +30,14 @@ func TestConnect(t *testing.T) {
 
 	exec.Command("xfce4-terminal").Start()
 
-	<-testSigs
+	for {
+		select {
+		case win := <-wm.NewWindow:
+			pt("new window %v\n", win)
+		case stroke := <-wm.Strokes:
+			pt("stroke %v\n", stroke)
+		case <-testSigs:
+			return
+		}
+	}
 }
