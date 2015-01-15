@@ -42,20 +42,18 @@ func New(config *Config) (*Wm, error) {
 	defaultRootId := defaultScreen.Root
 
 	// grab control
-	if xproto.ChangeWindowAttributesChecked(conn, defaultRootId, xproto.CwEventMask, []uint32{uint32(
+	if err := xproto.ChangeWindowAttributesChecked(conn, defaultRootId, xproto.CwEventMask, []uint32{uint32(
 		xproto.EventMaskSubstructureRedirect |
 			xproto.EventMaskSubstructureNotify |
-			xproto.EventMaskStructureNotify |
-			xproto.EventMaskPropertyChange |
-			xproto.EventMaskFocusChange |
-			xproto.EventMaskButtonRelease |
-			xproto.EventMaskButtonPress)}).Check() != nil {
+			xproto.EventMaskPropertyChange)}).Check(); err != nil {
 		return nil, ef("another wm is running: %v", err)
 	}
-	if _, err := xproto.GrabKeyboard(conn, false, defaultRootId, 0,
-		xproto.GrabModeAsync, xproto.GrabModeAsync).Reply(); err != nil {
-		return nil, ef("grab keyboard fail: %v", err)
-	}
+	/*
+		if err := xproto.GrabKeyChecked(conn, true, defaultRootId, xproto.ModMaskAny, xproto.GrabAny,
+			xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
+			return nil, ef("grab key error: %v", err)
+		}
+	*/
 
 	wm := &Wm{
 		Conn:          conn,
@@ -78,6 +76,7 @@ func New(config *Config) (*Wm, error) {
 }
 
 func (w *Wm) Close() {
+	//TODO notify and wait for loop to exit
 	xproto.ChangeWindowAttributes(w.Conn, w.DefaultRootId, xproto.CwEventMask, []uint32{uint32(
 		xproto.EventMaskNoEvent)})
 	w.Conn.Close()
@@ -150,6 +149,8 @@ func (w *Wm) loop() {
 					continue
 				}
 				xproto.MapWindow(w.Conn, win.Id)
+
+			case xproto.MapNotifyEvent:
 
 			default:
 				w.pt("NOT HANDLED EVENT: %T %v\n", ev, ev)
