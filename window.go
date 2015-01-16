@@ -2,7 +2,17 @@ package wmutil
 
 import "github.com/BurntSushi/xgb/xproto"
 
-//TODO get focused
+func (w *Wm) GetFocus() *Window {
+	reply, err := xproto.GetInputFocus(w.Conn).Reply()
+	if err != nil {
+		return nil
+	}
+	win, ok := w.Windows[reply.Focus]
+	if !ok {
+		return nil
+	}
+	return win
+}
 
 func (w *Window) Focus() {
 	if err := xproto.SetInputFocusChecked(w.wm.Conn, xproto.InputFocusPointerRoot, w.Id, 0).Check(); err != nil {

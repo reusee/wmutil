@@ -59,7 +59,7 @@ func TestConnect(t *testing.T) {
 				windows[0].Below(windows[1])
 				windows[1].Focus()
 			case Key_F4:
-				windows[0].Opposite(nil)
+				wm.GetFocus().Opposite(nil)
 			}
 			pt("stroke %v\n", stroke)
 		case <-testSigs:
