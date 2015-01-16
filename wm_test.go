@@ -47,6 +47,7 @@ func TestConnect(t *testing.T) {
 				win.SetSize(500, 100)
 			}
 			windows = append(windows, win)
+			win.WarpPointer()
 		case win := <-wm.Unmap:
 			pt("window unmap %v\n", win)
 		case stroke := <-wm.Stroke:
