@@ -39,7 +39,6 @@ func TestConnect(t *testing.T) {
 		select {
 		case win := <-wm.Map:
 			pt("window mapped %v\n", win)
-			win.Focus()
 			n := len(windows)
 			if n > 1 {
 				win.SetGeometry(n*50, n*50, 500, 100)
@@ -57,27 +56,12 @@ func TestConnect(t *testing.T) {
 				exec.Command("sakura").Start()
 			case Key_F2:
 				windows[0].Above(nil)
-				windows[0].Focus()
 			case Key_F3:
 				windows[0].Below(windows[1])
-				windows[1].Focus()
 			case Key_F4:
-				wm.GetFocus().Opposite(nil)
 			case Key_F5:
-				win := wm.GetFocus()
-				if win != nil {
-					wm.GetFocus().Below(nil)
-				}
 			case Key_F6:
-				win := wm.GetFocus()
-				if win != nil {
-					win.Destroy()
-				}
 			}
-		case win := <-wm.FocusIn:
-			pt("focus in %v\n", win)
-		case win := <-wm.FocusOut:
-			pt("focus out %v\n", win)
 		case <-testSigs:
 			return
 		}

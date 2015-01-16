@@ -2,31 +2,6 @@ package wmutil
 
 import "github.com/BurntSushi/xgb/xproto"
 
-func (w *Wm) GetFocus() *Window {
-	reply, err := xproto.GetInputFocus(w.Conn).Reply()
-	if err != nil {
-		return nil
-	}
-	win, ok := w.Windows[reply.Focus]
-	if !ok {
-		return nil
-	}
-	return win
-}
-
-func (w *Wm) FocusPointerRoot() {
-	if err := xproto.SetInputFocusChecked(w.Conn, 0, xproto.InputFocusPointerRoot, 0).Check(); err != nil {
-		w.pt("ERROR: set focus to pointer root %v", err)
-	}
-}
-
-func (w *Window) Focus() {
-	//TODO pointer root or none?
-	if err := xproto.SetInputFocusChecked(w.wm.Conn, xproto.InputFocusPointerRoot, w.Id, 0).Check(); err != nil {
-		w.wm.pt("ERROR: set input focus: %v", err)
-	}
-}
-
 func (w *Window) SetPos(x, y int) {
 	if err := xproto.ConfigureWindowChecked(w.wm.Conn, w.Id,
 		xproto.ConfigWindowX|xproto.ConfigWindowY, []uint32{uint32(x), uint32(y)}).Check(); err != nil {

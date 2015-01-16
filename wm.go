@@ -21,11 +21,9 @@ type Wm struct {
 
 	logger *log.Logger
 
-	Map      chan *Window
-	Unmap    chan *Window
-	Stroke   chan Stroke
-	FocusIn  chan *Window
-	FocusOut chan *Window
+	Map    chan *Window
+	Unmap  chan *Window
+	Stroke chan Stroke
 }
 
 type Window struct {
@@ -154,8 +152,6 @@ func New(config *Config) (*Wm, error) {
 		Stroke:        make(chan Stroke),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
-		FocusIn:       make(chan *Window),
-		FocusOut:      make(chan *Window),
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
@@ -208,10 +204,6 @@ func (w *Wm) loop() {
 					Border: int(ev.BorderWidth),
 				}
 				w.Windows[win.Id] = win
-				if err := xproto.ChangeWindowAttributesChecked(w.Conn, win.Id, xproto.CwEventMask, []uint32{
-					uint32(xproto.EventMaskFocusChange)}).Check(); err != nil {
-					w.pt("set managed window attributes: %v", err)
-				}
 				w.pt("managed window %v\n", win.Id)
 
 			case xproto.ConfigureRequestEvent:
@@ -276,17 +268,6 @@ func (w *Wm) loop() {
 					Sym:       w.CodeToSyms[ev.Detail][0],
 				}
 			case xproto.KeyReleaseEvent:
-
-			case xproto.FocusInEvent:
-				win, ok := w.Windows[ev.Event]
-				if ok {
-					w.FocusIn <- win
-				}
-			case xproto.FocusOutEvent:
-				win, ok := w.Windows[ev.Event]
-				if ok {
-					w.FocusOut <- win
-				}
 
 			default:
 				w.pt("EVENT: %T %v\n", ev, ev)
