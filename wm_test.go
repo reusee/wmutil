@@ -35,7 +35,7 @@ func TestConnect(t *testing.T) {
 	var windows []*Window
 	for {
 		select {
-		case win := <-wm.MapWindow:
+		case win := <-wm.Map:
 			pt("window mapped %v\n", win)
 			win.Focus()
 			n := len(windows)
@@ -46,9 +46,9 @@ func TestConnect(t *testing.T) {
 				win.SetSize(500, 100)
 			}
 			windows = append(windows, win)
-		case win := <-wm.UnmapWindow:
+		case win := <-wm.Unmap:
 			pt("window unmap %v\n", win)
-		case stroke := <-wm.Strokes:
+		case stroke := <-wm.Stroke:
 			switch stroke.Sym {
 			case Key_F1:
 				exec.Command("sakura").Start()
@@ -62,6 +62,10 @@ func TestConnect(t *testing.T) {
 				wm.GetFocus().Opposite(nil)
 			}
 			pt("stroke %v\n", stroke)
+		case win := <-wm.FocusIn:
+			pt("focus in %v\n", win)
+		case win := <-wm.FocusOut:
+			pt("focus out %v\n", win)
 		case <-testSigs:
 			return
 		}
