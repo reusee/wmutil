@@ -22,6 +22,7 @@ type Wm struct {
 	logger *log.Logger
 
 	NewWindow chan *Window
+	DelWindow chan *Window
 	Strokes   chan Stroke
 }
 
@@ -146,6 +147,7 @@ func New(config *Config) (*Wm, error) {
 		DefaultRootId: defaultRootId,
 		Windows:       make(map[xproto.Window]*Window),
 		NewWindow:     make(chan *Window),
+		DelWindow:     make(chan *Window),
 		Strokes:       make(chan Stroke),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
@@ -182,6 +184,7 @@ func (w *Wm) loop() {
 		}
 
 		if ev != nil {
+			w.pt("EVENT: %T %v\n", ev, ev)
 			switch ev := ev.(type) {
 
 			case xproto.CreateNotifyEvent:
@@ -197,7 +200,7 @@ func (w *Wm) loop() {
 					Height: int(ev.Height),
 					Border: int(ev.BorderWidth),
 				}
-				w.addWindow(win)
+				w.addWindow(win) //TODO should we manage all window?
 
 			case xproto.ConfigureRequestEvent:
 				win, ok := w.Windows[ev.Window]
@@ -236,6 +239,16 @@ func (w *Wm) loop() {
 
 			case xproto.MapNotifyEvent:
 
+			case xproto.UnmapNotifyEvent:
+				win, ok := w.Windows[ev.Window]
+				if !ok {
+					continue
+				}
+				win.Mapped = false
+
+			case xproto.DestroyNotifyEvent:
+				w.delWindow(ev.Window)
+
 			case xproto.KeyPressEvent:
 				w.Strokes <- Stroke{
 					Modifiers: ev.State,
@@ -243,8 +256,6 @@ func (w *Wm) loop() {
 				}
 			case xproto.KeyReleaseEvent:
 
-			default:
-				w.pt("NOT HANDLED EVENT: %T %v\n", ev, ev)
 			}
 		}
 	}
@@ -254,4 +265,14 @@ func (w *Wm) addWindow(win *Window) {
 	w.pt("added window %v\n", win.Id)
 	w.Windows[win.Id] = win
 	w.NewWindow <- win
+}
+
+func (w *Wm) delWindow(id xproto.Window) {
+	win, ok := w.Windows[id]
+	if !ok {
+		return
+	}
+	delete(w.Windows, id)
+	w.pt("delete window %v, left %d\n", id, len(w.Windows))
+	w.DelWindow <- win
 }

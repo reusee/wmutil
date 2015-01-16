@@ -34,7 +34,10 @@ func TestConnect(t *testing.T) {
 		select {
 		case win := <-wm.NewWindow:
 			pt("new window %v\n", win)
+		case win := <-wm.DelWindow:
+			pt("del window %v\n", win)
 		case stroke := <-wm.Strokes:
+			exec.Command("sakura").Start()
 			pt("stroke %v\n", stroke)
 		case <-testSigs:
 			return
