@@ -86,6 +86,37 @@ func New(config *Config) (*Wm, error) {
 		}
 	}
 
+	// get modifier mask
+	mmReply, err := xproto.GetModifierMapping(conn).Reply()
+	if err != nil {
+		return nil, ef("get modifier mapping: %v", err)
+	}
+	symToModMask := func(sym uint32) uint16 {
+		code := keysymToKeycodes[sym][0]
+		index := 0
+	loop:
+		for ; index < 8; index++ {
+			start := index * int(mmReply.KeycodesPerModifier)
+			codes := mmReply.Keycodes[start : start+int(mmReply.KeycodesPerModifier)]
+			for _, c := range codes {
+				if byte(c) == code {
+					break loop
+				}
+			}
+		}
+		return []uint16{
+			xproto.ModMaskShift,
+			xproto.ModMaskLock,
+			xproto.ModMaskControl,
+			xproto.ModMask1,
+			xproto.ModMask2,
+			xproto.ModMask3,
+			xproto.ModMask4,
+			xproto.ModMask5,
+		}[index]
+	}
+	numlockModMask := symToModMask(Key_Num_Lock)
+
 	// grab keys
 	if err := xproto.UngrabKeyChecked(conn, xproto.GrabAny, defaultRootId, xproto.ModMaskAny).Check(); err != nil {
 		return nil, ef("ungrab keys: %v", err)
@@ -93,8 +124,8 @@ func New(config *Config) (*Wm, error) {
 	ignoreModifiers := []uint16{
 		0,
 		xproto.ModMaskLock,
-		xproto.ModMask2, //TODO read from modifier mappings
-		xproto.ModMaskLock | xproto.ModMask2,
+		numlockModMask,
+		xproto.ModMaskLock | numlockModMask,
 	}
 	for _, stroke := range config.Strokes {
 		for _, mod := range ignoreModifiers {
