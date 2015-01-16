@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 func TestConnect(t *testing.T) {
 	wm, err := New(&Config{
 		Strokes: []Stroke{
-			{xproto.ModMaskControl, 41},
+			{xproto.ModMaskControl, 102},
 		},
 	})
 	if err != nil {

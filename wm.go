@@ -14,6 +14,8 @@ type Wm struct {
 	DefaultScreen *xproto.ScreenInfo
 	DefaultRootId xproto.Window
 	Windows       map[xproto.Window]*Window
+	CodeToSyms    [][]uint32
+	SymToCodes    map[uint32][]byte
 
 	logger *log.Logger
 
@@ -35,7 +37,7 @@ type Config struct {
 
 type Stroke struct {
 	Modifiers uint16
-	Key       byte
+	Sym       uint32
 }
 
 func New(config *Config) (*Wm, error) {
@@ -61,20 +63,45 @@ func New(config *Config) (*Wm, error) {
 			xproto.EventMaskPropertyChange)}).Check(); err != nil {
 		return nil, ef("another wm is running: %v", err)
 	}
+
+	// read keyboard mapping
+	kmReply, err := xproto.GetKeyboardMapping(conn, 8, 248).Reply()
+	if err != nil {
+		return nil, ef("get keyboard mapping: %v", err)
+	}
+	keycodeToKeysyms := make([][]uint32, 256)
+	keysymToKeycodes := make(map[uint32][]byte)
+	for keycode := 8; keycode <= 255; keycode++ {
+		start := (keycode - 8) * int(kmReply.KeysymsPerKeycode)
+		keysyms := kmReply.Keysyms[start : start+int(kmReply.KeysymsPerKeycode)]
+		for _, sym := range keysyms {
+			if sym == 0 {
+				continue
+			}
+			keysym := uint32(sym)
+			keycodeToKeysyms[keycode] = append(keycodeToKeysyms[keycode], uint32(keysym))
+			keysymToKeycodes[keysym] = append(keysymToKeycodes[keysym], byte(keycode))
+		}
+	}
+
+	// grab keys
 	if err := xproto.UngrabKeyChecked(conn, xproto.GrabAny, defaultRootId, xproto.ModMaskAny).Check(); err != nil {
 		return nil, ef("ungrab keys: %v", err)
 	}
 	ignoreModifiers := []uint16{
 		0,
 		xproto.ModMaskLock,
-		xproto.ModMask2,
+		xproto.ModMask2, //TODO read from modifier mappings
 		xproto.ModMaskLock | xproto.ModMask2,
 	}
 	for _, stroke := range config.Strokes {
 		for _, mod := range ignoreModifiers {
-			if err := xproto.GrabKeyChecked(conn, true, defaultRootId, stroke.Modifiers|mod,
-				xproto.Keycode(stroke.Key), xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
-				return nil, ef("grab key: %v", err)
+			keycodes := keysymToKeycodes[stroke.Sym]
+			for _, code := range keycodes {
+				if err := xproto.GrabKeyChecked(conn, true, defaultRootId, stroke.Modifiers|mod,
+					xproto.Keycode(code), xproto.GrabModeAsync, xproto.GrabModeAsync).Check(); err != nil {
+					return nil, ef("grab key: %v", err)
+				}
 			}
 		}
 	}
@@ -87,6 +114,8 @@ func New(config *Config) (*Wm, error) {
 		Windows:       make(map[xproto.Window]*Window),
 		NewWindow:     make(chan *Window),
 		Strokes:       make(chan Stroke),
+		CodeToSyms:    keycodeToKeysyms,
+		SymToCodes:    keysymToKeycodes,
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
@@ -99,7 +128,6 @@ func New(config *Config) (*Wm, error) {
 }
 
 func (w *Wm) Close() {
-	//TODO notify and wait for loop to exit
 	xproto.ChangeWindowAttributes(w.Conn, w.DefaultRootId, xproto.CwEventMask, []uint32{uint32(
 		xproto.EventMaskNoEvent)})
 	w.Conn.Close()
@@ -178,7 +206,7 @@ func (w *Wm) loop() {
 			case xproto.KeyPressEvent:
 				w.Strokes <- Stroke{
 					Modifiers: ev.State,
-					Key:       byte(ev.Detail),
+					Sym:       w.CodeToSyms[ev.Detail][0], //TODO multiple syms
 				}
 			case xproto.KeyReleaseEvent:
 
