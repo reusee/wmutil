@@ -27,6 +27,7 @@ type Wm struct {
 }
 
 type Window struct {
+	wm                          *Wm
 	Id                          xproto.Window
 	Parent                      xproto.Window
 	X, Y, Width, Height, Border int
@@ -192,6 +193,7 @@ func (w *Wm) loop() {
 					continue
 				}
 				win := &Window{
+					wm:     w,
 					Id:     ev.Window,
 					Parent: ev.Parent,
 					X:      int(ev.X),
