@@ -110,3 +110,15 @@ func (w *Window) WarpPointer() {
 		w.wm.pt("ERROR: warp pointer: %v\n", err)
 	}
 }
+
+func (wm *Wm) PointingWindow() *Window {
+	reply, err := xproto.QueryPointer(wm.Conn, wm.DefaultRootId).Reply()
+	if err != nil {
+		wm.pt("ERROR: query pointer: %v\n", err)
+	}
+	win, ok := wm.Windows[reply.Child]
+	if !ok {
+		return nil
+	}
+	return win
+}

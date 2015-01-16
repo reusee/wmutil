@@ -60,6 +60,10 @@ func TestConnect(t *testing.T) {
 			case Key_F3:
 				windows[0].Below(windows[1])
 			case Key_F4:
+				win := wm.PointingWindow()
+				if win != nil {
+					pt("pointing %v\n", win.Id)
+				}
 			case Key_F5:
 			case Key_F6:
 			}
