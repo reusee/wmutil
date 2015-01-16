@@ -21,9 +21,9 @@ type Wm struct {
 
 	logger *log.Logger
 
-	NewWindow chan *Window
-	DelWindow chan *Window
-	Strokes   chan Stroke
+	MapWindow   chan *Window
+	UnmapWindow chan *Window
+	Strokes     chan Stroke
 }
 
 type Window struct {
@@ -146,8 +146,8 @@ func New(config *Config) (*Wm, error) {
 		DefaultScreen: defaultScreen,
 		DefaultRootId: defaultRootId,
 		Windows:       make(map[xproto.Window]*Window),
-		NewWindow:     make(chan *Window),
-		DelWindow:     make(chan *Window),
+		MapWindow:     make(chan *Window),
+		UnmapWindow:   make(chan *Window),
 		Strokes:       make(chan Stroke),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
@@ -188,7 +188,7 @@ func (w *Wm) loop() {
 			switch ev := ev.(type) {
 
 			case xproto.CreateNotifyEvent:
-				if ev.OverrideRedirect {
+				if ev.OverrideRedirect { // do not manage override-redirect windows
 					continue
 				}
 				win := &Window{
@@ -200,79 +200,72 @@ func (w *Wm) loop() {
 					Height: int(ev.Height),
 					Border: int(ev.BorderWidth),
 				}
-				w.addWindow(win) //TODO should we manage all window?
+				w.Windows[win.Id] = win
+				w.pt("managed window %v\n", win.Id)
 
 			case xproto.ConfigureRequestEvent:
-				win, ok := w.Windows[ev.Window]
-				if !ok { // not managed window, add to Windows
-					win = &Window{
-						Id:     ev.Window,
-						Parent: ev.Parent,
-						X:      int(ev.X),
-						Y:      int(ev.Y),
-						Width:  int(ev.Width),
-						Height: int(ev.Height),
-						Border: int(ev.BorderWidth),
+				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
+					notifyEv := xproto.ConfigureNotifyEvent{ // not moving or resizing
+						Event:  win.Id,
+						Window: win.Id,
+						X:      int16(win.X),
+						Y:      int16(win.Y),
+						Width:  uint16(win.Width),
+						Height: uint16(win.Height),
 					}
-					w.addWindow(win)
+					xproto.SendEvent(w.Conn, false, win.Id, xproto.EventMaskStructureNotify, string(notifyEv.Bytes()))
+				} else { // configure as requested
+					var vals []uint32
+					flags := ev.ValueMask
+					if xproto.ConfigWindowX&flags > 0 {
+						vals = append(vals, uint32(ev.X))
+					}
+					if xproto.ConfigWindowY&flags > 0 {
+						vals = append(vals, uint32(ev.Y))
+					}
+					if xproto.ConfigWindowWidth&flags > 0 {
+						vals = append(vals, uint32(ev.Width))
+					}
+					if xproto.ConfigWindowHeight&flags > 0 {
+						vals = append(vals, uint32(ev.Height))
+					}
+					if xproto.ConfigWindowBorderWidth&flags > 0 {
+						vals = append(vals, 0) // do not set border width
+					}
+					if xproto.ConfigWindowSibling&flags > 0 {
+						vals = append(vals, uint32(ev.Sibling))
+					}
+					if xproto.ConfigWindowStackMode&flags > 0 {
+						vals = append(vals, uint32(ev.StackMode))
+					}
+					xproto.ConfigureWindow(w.Conn, ev.Window, flags, vals)
 				}
-				// not moving or resizing, layout will do these
-				notifyEv := xproto.ConfigureNotifyEvent{
-					Event:  win.Id,
-					Window: win.Id,
-					X:      int16(win.X),
-					Y:      int16(win.Y),
-					Width:  uint16(win.Width),
-					Height: uint16(win.Height),
-				}
-				xproto.SendEvent(w.Conn, false, win.Id, xproto.EventMaskStructureNotify, string(notifyEv.Bytes()))
 
 			case xproto.MapRequestEvent:
-				win, ok := w.Windows[ev.Window]
-				if !ok { // skip not managed window. may be override-redirect
-					continue
+				xproto.MapWindow(w.Conn, ev.Window)
+				if win, ok := w.Windows[ev.Window]; ok {
+					win.Mapped = true
+					w.MapWindow <- win
 				}
-				if win.Mapped {
-					continue
-				}
-				xproto.MapWindow(w.Conn, win.Id)
-
 			case xproto.MapNotifyEvent:
 
 			case xproto.UnmapNotifyEvent:
-				win, ok := w.Windows[ev.Window]
-				if !ok {
-					continue
+				if win, ok := w.Windows[ev.Window]; ok {
+					win.Mapped = false
+					w.UnmapWindow <- win
 				}
-				win.Mapped = false
 
 			case xproto.DestroyNotifyEvent:
-				w.delWindow(ev.Window)
+				delete(w.Windows, ev.Window)
 
 			case xproto.KeyPressEvent:
 				w.Strokes <- Stroke{
 					Modifiers: ev.State,
-					Sym:       w.CodeToSyms[ev.Detail][0], //TODO multiple syms
+					Sym:       w.CodeToSyms[ev.Detail][0],
 				}
 			case xproto.KeyReleaseEvent:
 
 			}
 		}
 	}
-}
-
-func (w *Wm) addWindow(win *Window) {
-	w.pt("added window %v\n", win.Id)
-	w.Windows[win.Id] = win
-	w.NewWindow <- win
-}
-
-func (w *Wm) delWindow(id xproto.Window) {
-	win, ok := w.Windows[id]
-	if !ok {
-		return
-	}
-	delete(w.Windows, id)
-	w.pt("delete window %v, left %d\n", id, len(w.Windows))
-	w.DelWindow <- win
 }

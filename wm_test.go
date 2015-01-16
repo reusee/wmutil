@@ -28,14 +28,12 @@ func TestConnect(t *testing.T) {
 	}
 	defer wm.Close()
 
-	exec.Command("xfce4-terminal").Start()
-
 	for {
 		select {
-		case win := <-wm.NewWindow:
-			pt("new window %v\n", win)
-		case win := <-wm.DelWindow:
-			pt("del window %v\n", win)
+		case win := <-wm.MapWindow:
+			pt("window mapped %v\n", win)
+		case win := <-wm.UnmapWindow:
+			pt("window unmap %v\n", win)
 		case stroke := <-wm.Strokes:
 			exec.Command("sakura").Start()
 			pt("stroke %v\n", stroke)
