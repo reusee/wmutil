@@ -22,8 +22,7 @@ func genSymDefs() {
 	w := func(format string, args ...interface{}) {
 		fmt.Fprintf(buf, format, args...)
 	}
-	w(`// generate from X11/keysymdef.h
-package wmutil
+	w(`package wmutil
 
 var (
 `)

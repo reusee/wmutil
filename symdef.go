@@ -1,4 +1,3 @@
-// generate from X11/keysymdef.h
 package wmutil
 
 var (
