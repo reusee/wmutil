@@ -14,7 +14,14 @@ func (w *Wm) GetFocus() *Window {
 	return win
 }
 
+func (w *Wm) FocusPointerRoot() {
+	if err := xproto.SetInputFocusChecked(w.Conn, 0, xproto.InputFocusPointerRoot, 0).Check(); err != nil {
+		w.pt("ERROR: set focus to pointer root %v", err)
+	}
+}
+
 func (w *Window) Focus() {
+	//TODO pointer root or none?
 	if err := xproto.SetInputFocusChecked(w.wm.Conn, xproto.InputFocusPointerRoot, w.Id, 0).Check(); err != nil {
 		w.wm.pt("ERROR: set input focus: %v", err)
 	}
@@ -114,5 +121,11 @@ func (w *Window) Opposite(sibling *Window) {
 			xproto.ConfigWindowStackMode, []uint32{uint32(xproto.StackModeOpposite)}).Check(); err != nil {
 			w.wm.pt("ERROR: set window above: %v", err)
 		}
+	}
+}
+
+func (w *Window) Destroy() {
+	if err := xproto.DestroyWindowChecked(w.wm.Conn, w.Id).Check(); err != nil {
+		w.wm.pt("ERROR: destroy window: %v", err)
 	}
 }

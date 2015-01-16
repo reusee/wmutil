@@ -25,6 +25,8 @@ func TestConnect(t *testing.T) {
 			{0, Key_F2},
 			{0, Key_F3},
 			{0, Key_F4},
+			{0, Key_F5},
+			{0, Key_F6},
 		},
 	})
 	if err != nil {
@@ -49,6 +51,7 @@ func TestConnect(t *testing.T) {
 		case win := <-wm.Unmap:
 			pt("window unmap %v\n", win)
 		case stroke := <-wm.Stroke:
+			pt("stroke %v\n", stroke)
 			switch stroke.Sym {
 			case Key_F1:
 				exec.Command("sakura").Start()
@@ -60,8 +63,17 @@ func TestConnect(t *testing.T) {
 				windows[1].Focus()
 			case Key_F4:
 				wm.GetFocus().Opposite(nil)
+			case Key_F5:
+				win := wm.GetFocus()
+				if win != nil {
+					wm.GetFocus().Below(nil)
+				}
+			case Key_F6:
+				win := wm.GetFocus()
+				if win != nil {
+					win.Destroy()
+				}
 			}
-			pt("stroke %v\n", stroke)
 		case win := <-wm.FocusIn:
 			pt("focus in %v\n", win)
 		case win := <-wm.FocusOut:
