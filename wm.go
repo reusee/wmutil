@@ -1,5 +1,7 @@
 package wmutil
 
+//go:generate go run gen.go
+
 import (
 	"log"
 	"os"
