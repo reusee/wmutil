@@ -5,6 +5,7 @@ package wmutil
 import (
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/BurntSushi/xgb"
@@ -25,6 +26,7 @@ type Wm struct {
 	Map    chan *Window
 	Unmap  chan *Window
 	Stroke chan Stroke
+	Change chan ChangeNotify
 }
 
 type Window struct {
@@ -34,6 +36,7 @@ type Window struct {
 	Parent                      xproto.Window
 	X, Y, Width, Height, Border int
 	Mapped                      bool
+	Name                        string
 }
 
 type Config struct {
@@ -44,6 +47,11 @@ type Config struct {
 type Stroke struct {
 	Modifiers uint16
 	Sym       uint32
+}
+
+type ChangeNotify struct {
+	Window *Window
+	Atom   xproto.Atom
 }
 
 func New(config *Config) (*Wm, error) {
@@ -152,6 +160,7 @@ func New(config *Config) (*Wm, error) {
 		Map:           make(chan *Window),
 		Unmap:         make(chan *Window),
 		Stroke:        make(chan Stroke),
+		Change:        make(chan ChangeNotify),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
 	}
@@ -207,7 +216,10 @@ func (w *Wm) loop() {
 					Border:  int(ev.BorderWidth),
 				}
 				w.Windows[win.Id] = win
-				w.pt("managed window %v\n", win.Id)
+				if err := xproto.ChangeWindowAttributesChecked(w.Conn, win.Id, xproto.CwEventMask, []uint32{uint32(
+					xproto.EventMaskPropertyChange)}).Check(); err != nil {
+					w.pt("ERROR: set window event mask: %v\n", err)
+				}
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
@@ -273,6 +285,23 @@ func (w *Wm) loop() {
 					Sym:       w.CodeToSyms[ev.Detail][0],
 				}
 			case xproto.KeyReleaseEvent:
+
+			case xproto.PropertyNotifyEvent:
+				win, ok := w.Windows[ev.Window]
+				if !ok { // not managed
+					continue
+				}
+				switch ev.Atom {
+				case xproto.AtomWmName:
+					names := win.GetStrsProperty(xproto.AtomWmName)
+					win.WriteLock(func() {
+						win.Name = strings.Join(names, "")
+					})
+				}
+				w.Change <- ChangeNotify{
+					Window: win,
+					Atom:   ev.Atom,
+				}
 
 			default:
 				w.pt("EVENT: %T %v\n", ev, ev)

@@ -67,6 +67,13 @@ func TestConnect(t *testing.T) {
 			case Key_F5:
 			case Key_F6:
 			}
+		case change := <-wm.Change:
+			switch change.Atom {
+			case xproto.AtomWmName:
+				change.Window.ReadLock(func() {
+					pt("window name: %v\n", change.Window.Name)
+				})
+			}
 		case <-testSigs:
 			return
 		}

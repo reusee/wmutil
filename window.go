@@ -152,3 +152,22 @@ func (w *Wm) FocusPointerRoot() {
 		w.pt("ERROR: set focus to pointer root %v", err)
 	}
 }
+
+func (w *Window) GetStrsProperty(atom xproto.Atom) (ret []string) {
+	reply, err := xproto.GetProperty(w.wm.Conn, false, w.Id, atom, xproto.GetPropertyTypeAny, 0, (1<<32)-1).Reply()
+	if err != nil {
+		w.wm.pt("ERROR: get window property: %v\n", err)
+		return
+	}
+	start := 0
+	for i, c := range reply.Value {
+		if c == 0 {
+			ret = append(ret, string(reply.Value[start:i]))
+			start = i + 1
+		}
+	}
+	if start < int(reply.ValueLen) {
+		ret = append(ret, string(reply.Value[start:]))
+	}
+	return
+}
