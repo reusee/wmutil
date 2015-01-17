@@ -292,14 +292,18 @@ func (w *Wm) loop() {
 			case xproto.MapRequestEvent:
 				xproto.MapWindow(w.Conn, ev.Window)
 				if win, ok := w.Windows[ev.Window]; ok {
-					win.Mapped = true
+					win.WriteLock(func() {
+						win.Mapped = true
+					})
 					w.Map <- win
 				}
 			case xproto.MapNotifyEvent:
 
 			case xproto.UnmapNotifyEvent:
 				if win, ok := w.Windows[ev.Window]; ok {
-					win.Mapped = false
+					win.WriteLock(func() {
+						win.Mapped = false
+					})
 					w.Unmap <- win
 				}
 
