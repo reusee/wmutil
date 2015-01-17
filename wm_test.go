@@ -38,7 +38,7 @@ func TestConnect(t *testing.T) {
 	for {
 		select {
 		case win := <-wm.Map:
-			pt("window mapped %v\n", win)
+			pt("window %v mapped instance %s class %s\n", win, win.Instance, win.Class)
 			n := len(windows)
 			if n > 1 {
 				win.SetGeometry(n*50, n*50, 500, 100)
@@ -72,6 +72,10 @@ func TestConnect(t *testing.T) {
 			case xproto.AtomWmName:
 				change.Window.ReadLock(func() {
 					pt("window name: %v\n", change.Window.Name)
+				})
+			case xproto.AtomWmIconName:
+				change.Window.ReadLock(func() {
+					pt("window icon: %v\n", change.Window.Icon)
 				})
 			}
 		case <-testSigs:

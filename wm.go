@@ -36,7 +36,11 @@ type Window struct {
 	Parent                      xproto.Window
 	X, Y, Width, Height, Border int
 	Mapped                      bool
-	Name                        string
+	// properties
+	Name     string
+	Icon     string
+	Instance string
+	Class    string
 }
 
 type Config struct {
@@ -220,6 +224,11 @@ func (w *Wm) loop() {
 					xproto.EventMaskPropertyChange)}).Check(); err != nil {
 					w.pt("ERROR: set window event mask: %v\n", err)
 				}
+				classInfo := win.GetStrsProperty(xproto.AtomWmClass)
+				if len(classInfo) > 0 {
+					win.Instance = classInfo[0]
+					win.Class = classInfo[1]
+				}
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
@@ -293,9 +302,14 @@ func (w *Wm) loop() {
 				}
 				switch ev.Atom {
 				case xproto.AtomWmName:
-					names := win.GetStrsProperty(xproto.AtomWmName)
+					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Name = strings.Join(names, "")
+					})
+				case xproto.AtomWmIconName:
+					names := win.GetStrsProperty(ev.Atom)
+					win.WriteLock(func() {
+						win.Icon = strings.Join(names, "")
 					})
 				}
 				w.Change <- ChangeNotify{
