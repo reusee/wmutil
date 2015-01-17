@@ -1,6 +1,9 @@
 package wmutil
 
-import "github.com/BurntSushi/xgb/xproto"
+import (
+	"github.com/BurntSushi/xgb"
+	"github.com/BurntSushi/xgb/xproto"
+)
 
 func (w *Window) ReadLock(fn func()) {
 	w.RLock()
@@ -170,4 +173,16 @@ func (w *Window) GetStrsProperty(atom xproto.Atom) (ret []string) {
 		ret = append(ret, string(reply.Value[start:]))
 	}
 	return
+}
+
+func (w *Window) GetWindowIdProperty(atom xproto.Atom) xproto.Window {
+	reply, err := xproto.GetProperty(w.wm.Conn, false, w.Id, atom, xproto.GetPropertyTypeAny, 0, (1<<32)-1).Reply()
+	if err != nil {
+		w.wm.pt("ERROR: get window property: %v\n", err)
+		return 0
+	}
+	if len(reply.Value) == 0 {
+		return 0
+	}
+	return xproto.Window(xgb.Get32(reply.Value))
 }

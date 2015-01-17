@@ -37,10 +37,11 @@ type Window struct {
 	X, Y, Width, Height, Border int
 	Mapped                      bool
 	// properties
-	Name     string
-	Icon     string
-	Instance string
-	Class    string
+	Name        string
+	Icon        string
+	Instance    string
+	Class       string
+	IsTransient bool
 }
 
 type Config struct {
@@ -220,15 +221,20 @@ func (w *Wm) loop() {
 					Border:  int(ev.BorderWidth),
 				}
 				w.Windows[win.Id] = win
+				// set event mask
 				if err := xproto.ChangeWindowAttributesChecked(w.Conn, win.Id, xproto.CwEventMask, []uint32{uint32(
 					xproto.EventMaskPropertyChange)}).Check(); err != nil {
 					w.pt("ERROR: set window event mask: %v\n", err)
 				}
+				// get class info
 				classInfo := win.GetStrsProperty(xproto.AtomWmClass)
 				if len(classInfo) > 0 {
 					win.Instance = classInfo[0]
 					win.Class = classInfo[1]
 				}
+				// whether transient window
+				transientFor := win.GetWindowIdProperty(xproto.AtomWmTransientFor)
+				win.IsTransient = transientFor != 0
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
