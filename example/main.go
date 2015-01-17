@@ -69,12 +69,20 @@ func main() {
 	}
 	defer wm.Close()
 
+	exec.Command("xsetroot", "-cursor_name", "left_ptr").Start()
+
 	screenWidth := int(wm.DefaultScreen.WidthInPixels)
 	screenHeight := int(wm.DefaultScreen.HeightInPixels)
+	windowWidth := 1400
+	windowHeight := screenHeight
+	startX := screenWidth - windowWidth
+	startY := (screenHeight - windowHeight) / 2
 	for {
 		select {
 		case win := <-wm.Map:
-			win.SetGeometry(0, 0, screenWidth, screenHeight)
+			if !win.IsTransient {
+				win.SetGeometry(startX, startY, windowWidth, windowHeight)
+			}
 			if wm.PointingWindow() != win {
 				win.WarpPointer()
 			}
