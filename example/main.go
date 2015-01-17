@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/user"
+	"path/filepath"
 
 	"github.com/BurntSushi/xgb/xproto"
 	"github.com/reusee/wmutil"
@@ -56,6 +58,18 @@ func main() {
 		},
 	}
 
+	logWriter := os.Stdout
+	if display != ":2" {
+		user, err := user.Current()
+		if err != nil {
+			log.Fatalf("get current user %v", err)
+		}
+		logWriter, err = os.Create(filepath.Join(user.HomeDir, ".wmutils-example.log"))
+		if err != nil {
+			log.Fatalf("open log file %v", err)
+		}
+	}
+
 	var strokes []wmutil.Stroke
 	for stroke, _ := range keyBindings {
 		strokes = append(strokes, stroke)
@@ -63,6 +77,7 @@ func main() {
 	var err error
 	wm, err = wmutil.New(&wmutil.Config{
 		Strokes: strokes,
+		Logger:  log.New(logWriter, "===|>", log.Lmicroseconds),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -73,8 +88,8 @@ func main() {
 
 	screenWidth := int(wm.DefaultScreen.WidthInPixels)
 	screenHeight := int(wm.DefaultScreen.HeightInPixels)
-	windowWidth := 1400
 	windowHeight := screenHeight
+	windowWidth := windowHeight / 3 * 4
 	startX := screenWidth - windowWidth
 	startY := (screenHeight - windowHeight) / 2
 	for {
