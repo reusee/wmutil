@@ -5,6 +5,7 @@ package wmutil
 import (
 	"log"
 	"os"
+	"sync"
 
 	"github.com/BurntSushi/xgb"
 	"github.com/BurntSushi/xgb/xproto"
@@ -27,6 +28,7 @@ type Wm struct {
 }
 
 type Window struct {
+	*sync.RWMutex
 	wm                          *Wm
 	Id                          xproto.Window
 	Parent                      xproto.Window
@@ -194,29 +196,32 @@ func (w *Wm) loop() {
 					continue
 				}
 				win := &Window{
-					wm:     w,
-					Id:     ev.Window,
-					Parent: ev.Parent,
-					X:      int(ev.X),
-					Y:      int(ev.Y),
-					Width:  int(ev.Width),
-					Height: int(ev.Height),
-					Border: int(ev.BorderWidth),
+					RWMutex: new(sync.RWMutex),
+					wm:      w,
+					Id:      ev.Window,
+					Parent:  ev.Parent,
+					X:       int(ev.X),
+					Y:       int(ev.Y),
+					Width:   int(ev.Width),
+					Height:  int(ev.Height),
+					Border:  int(ev.BorderWidth),
 				}
 				w.Windows[win.Id] = win
 				w.pt("managed window %v\n", win.Id)
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
-					notifyEv := xproto.ConfigureNotifyEvent{ // not moving or resizing
-						Event:  win.Id,
-						Window: win.Id,
-						X:      int16(win.X),
-						Y:      int16(win.Y),
-						Width:  uint16(win.Width),
-						Height: uint16(win.Height),
-					}
-					xproto.SendEvent(w.Conn, false, win.Id, xproto.EventMaskStructureNotify, string(notifyEv.Bytes()))
+					win.ReadLock(func() {
+						notifyEv := xproto.ConfigureNotifyEvent{ // not moving or resizing
+							Event:  win.Id,
+							Window: win.Id,
+							X:      int16(win.X),
+							Y:      int16(win.Y),
+							Width:  uint16(win.Width),
+							Height: uint16(win.Height),
+						}
+						xproto.SendEvent(w.Conn, false, win.Id, xproto.EventMaskStructureNotify, string(notifyEv.Bytes()))
+					})
 				} else { // configure as requested
 					var vals []uint32
 					flags := ev.ValueMask

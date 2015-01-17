@@ -2,10 +2,26 @@ package wmutil
 
 import "github.com/BurntSushi/xgb/xproto"
 
+func (w *Window) ReadLock(fn func()) {
+	w.RLock()
+	fn()
+	w.RUnlock()
+}
+
+func (w *Window) WriteLock(fn func()) {
+	w.Lock()
+	fn()
+	w.Unlock()
+}
+
 func (w *Window) SetPos(x, y int) {
 	if err := xproto.ConfigureWindowChecked(w.wm.Conn, w.Id,
 		xproto.ConfigWindowX|xproto.ConfigWindowY, []uint32{uint32(x), uint32(y)}).Check(); err != nil {
 		w.wm.pt("ERROR: set window position: %v\n", err)
+	} else {
+		w.WriteLock(func() {
+			w.X, w.Y = x, y
+		})
 	}
 }
 
@@ -13,6 +29,10 @@ func (w *Window) SetSize(width, height int) {
 	if err := xproto.ConfigureWindowChecked(w.wm.Conn, w.Id,
 		xproto.ConfigWindowWidth|xproto.ConfigWindowHeight, []uint32{uint32(width), uint32(height)}).Check(); err != nil {
 		w.wm.pt("ERROR: set window size: %v\n", err)
+	} else {
+		w.WriteLock(func() {
+			w.Width, w.Height = width, height
+		})
 	}
 }
 
@@ -21,6 +41,10 @@ func (w *Window) SetGeometry(x, y, width, height int) {
 		xproto.ConfigWindowX|xproto.ConfigWindowY|xproto.ConfigWindowWidth|xproto.ConfigWindowHeight,
 		[]uint32{uint32(x), uint32(y), uint32(width), uint32(height)}).Check(); err != nil {
 		w.wm.pt("ERROR: set window geometry: %v\n", err)
+	} else {
+		w.WriteLock(func() {
+			w.X, w.Y, w.Width, w.Height = x, y, width, height
+		})
 	}
 }
 
