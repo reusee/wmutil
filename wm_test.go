@@ -62,7 +62,8 @@ func TestConnect(t *testing.T) {
 			case Key_F4:
 				win := wm.PointingWindow()
 				if win != nil {
-					pt("pointing %v\n", win.Id)
+					pt("destroy %v\n", win.Id)
+					win.Destroy()
 				}
 			case Key_F5:
 			case Key_F6:

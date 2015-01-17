@@ -43,6 +43,7 @@ type Window struct {
 	Instance    string
 	Class       string
 	IsTransient bool
+	Protocols   []xproto.Atom
 }
 
 type Config struct {
@@ -210,6 +211,7 @@ func (w *Wm) loop() {
 			switch ev := ev.(type) {
 
 			case xproto.ClientMessageEvent:
+				w.pt("client message %s\n", w.AtomName(ev.Type))
 
 			case xproto.CreateNotifyEvent:
 				if ev.OverrideRedirect { // do not manage override-redirect windows
@@ -243,6 +245,8 @@ func (w *Wm) loop() {
 				win.IsTransient = transientFor != 0
 				// change WM_STATE
 				win.ChangeInt32sProperty(w.Atoms["WM_STATE"], w.Atoms["WM_STATE"], 1) // icccm NormalState
+				// get protocols
+				win.Protocols = win.GetAtomsProperty(w.Atoms["WM_PROTOCOLS"])
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request

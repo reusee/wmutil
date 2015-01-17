@@ -127,6 +127,25 @@ func (w *Window) Opposite(sibling *Window) {
 }
 
 func (w *Window) Destroy() {
+	atomDeleteWindow := w.wm.Atoms["WM_DELETE_WINDOW"]
+	for _, atom := range w.Protocols {
+		if atom == atomDeleteWindow {
+			// send message
+			msg := xproto.ClientMessageEvent{
+				Format: 32,
+				Window: w.Id,
+				Type:   w.wm.Atoms["WM_PROTOCOLS"],
+				Data: xproto.ClientMessageDataUnionData32New([]uint32{
+					uint32(atomDeleteWindow),
+					0, 0, 0, 0, // must be 20-bytes long
+				}),
+			}
+			if err := xproto.SendEventChecked(w.wm.Conn, false, w.Id, xproto.EventMaskNoEvent, string(msg.Bytes())).Check(); err != nil {
+				w.wm.pt("ERROR: send client message: %v\n", err)
+			}
+			return
+		}
+	}
 	if err := xproto.DestroyWindowChecked(w.wm.Conn, w.Id).Check(); err != nil {
 		w.wm.pt("ERROR: destroy window: %v\n", err)
 	}
@@ -185,6 +204,18 @@ func (w *Window) GetWindowIdProperty(atom xproto.Atom) xproto.Window {
 		return 0
 	}
 	return xproto.Window(xgb.Get32(reply.Value))
+}
+
+func (w *Window) GetAtomsProperty(atom xproto.Atom) (ret []xproto.Atom) {
+	reply, err := xproto.GetProperty(w.wm.Conn, false, w.Id, atom, xproto.GetPropertyTypeAny, 0, (1<<32)-1).Reply()
+	if err != nil {
+		w.wm.pt("ERROR: get window property: %v\n", err)
+		return
+	}
+	for i := uint32(0); i < reply.ValueLen; i += 4 {
+		ret = append(ret, xproto.Atom(xgb.Get32(reply.Value[i*4:])))
+	}
+	return
 }
 
 func (w *Window) ChangeInt32sProperty(atom, what xproto.Atom, ints ...uint32) {
