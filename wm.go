@@ -20,6 +20,7 @@ type Wm struct {
 	Windows       map[xproto.Window]*Window
 	CodeToSyms    [][]uint32
 	SymToCodes    map[uint32][]byte
+	Atoms         map[string]xproto.Atom
 
 	logger *log.Logger
 
@@ -168,14 +169,19 @@ func New(config *Config) (*Wm, error) {
 		Change:        make(chan ChangeNotify),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
+		Atoms:         make(map[string]xproto.Atom),
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
 	} else {
 		wm.logger = config.Logger
 	}
-	go wm.loop()
+	// intern atoms
+	if err := wm.internAtoms(); err != nil {
+		return nil, err
+	}
 
+	go wm.loop()
 	return wm, nil
 }
 
@@ -235,6 +241,8 @@ func (w *Wm) loop() {
 				// whether transient window
 				transientFor := win.GetWindowIdProperty(xproto.AtomWmTransientFor)
 				win.IsTransient = transientFor != 0
+				// change WM_STATE
+				win.ChangeInt32sProperty(w.Atoms["WM_STATE"], w.Atoms["WM_STATE"], 1) // icccm NormalState
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request

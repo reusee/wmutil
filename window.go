@@ -186,3 +186,15 @@ func (w *Window) GetWindowIdProperty(atom xproto.Atom) xproto.Window {
 	}
 	return xproto.Window(xgb.Get32(reply.Value))
 }
+
+func (w *Window) ChangeInt32sProperty(atom, what xproto.Atom, ints ...uint32) {
+	buf := make([]byte, len(ints)*4)
+	for i, integer := range ints {
+		xgb.Put32(buf[i*4:], integer)
+	}
+	err := xproto.ChangePropertyChecked(w.wm.Conn, xproto.PropModeReplace, w.Id, atom, what,
+		32, uint32(len(buf)/4), buf).Check()
+	if err != nil {
+		w.wm.pt("ERROR: change window ints property: %v\n", err)
+	}
+}
