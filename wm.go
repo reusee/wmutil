@@ -181,6 +181,10 @@ func New(config *Config) (*Wm, error) {
 	if err := wm.internAtoms(); err != nil {
 		return nil, err
 	}
+	// set supported ewmh hints
+	if err := wm.setSupported(); err != nil {
+		return nil, err
+	}
 
 	go wm.loop()
 	return wm, nil
@@ -328,11 +332,23 @@ func (w *Wm) loop() {
 					win.WriteLock(func() {
 						win.Name = strings.Join(names, "")
 					})
+				case w.Atoms["_NET_WM_NAME"]:
+					names := win.GetStrsProperty(ev.Atom)
+					win.WriteLock(func() {
+						win.Name = strings.Join(names, "")
+					})
 				case xproto.AtomWmIconName:
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Icon = strings.Join(names, "")
 					})
+				case w.Atoms["_NET_WM_ICON_NAME"]:
+					names := win.GetStrsProperty(ev.Atom)
+					win.WriteLock(func() {
+						win.Icon = strings.Join(names, "")
+					})
+				default:
+					w.pt("property notify %s %v\n", w.AtomName(ev.Atom), ev)
 				}
 				w.Change <- ChangeNotify{
 					Window: win,
