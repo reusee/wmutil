@@ -122,3 +122,9 @@ func (wm *Wm) PointingWindow() *Window {
 	}
 	return win
 }
+
+func (w *Wm) FocusPointerRoot() {
+	if err := xproto.SetInputFocusChecked(w.Conn, 0, xproto.InputFocusPointerRoot, 0).Check(); err != nil {
+		w.pt("ERROR: set focus to pointer root %v", err)
+	}
+}
