@@ -99,6 +99,8 @@ func main() {
 			if cb, ok := keyBindings[stroke]; ok {
 				cb()
 			}
+		case change := <-wm.Change:
+			_ = change
 		case <-kill:
 			return
 		}
