@@ -31,7 +31,7 @@ func main() {
 			close(kill)
 		},
 		wmutil.Stroke{mod, wmutil.Key_Return}: func() {
-			exec.Command("sakura").Start()
+			exec.Command("xfce4-terminal").Start()
 		},
 		wmutil.Stroke{mod, wmutil.Key_o}: func() {
 			exec.Command("dmenu_run").Start()
