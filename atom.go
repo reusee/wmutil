@@ -11,6 +11,7 @@ func (w *Wm) internAtoms() error {
 		"_NET_SUPPORTED",
 		"_NET_WM_NAME",
 		"_NET_WM_ICON_NAME",
+		"_NET_WM_USER_TIME",
 	}
 	for _, atom := range atoms {
 		reply, err := xproto.InternAtom(w.Conn, false, uint16(len(atom)), atom).Reply()

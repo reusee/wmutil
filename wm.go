@@ -24,10 +24,11 @@ type Wm struct {
 
 	logger *log.Logger
 
-	Map    chan *Window
-	Unmap  chan *Window
-	Stroke chan Stroke
-	Change chan ChangeNotify
+	Map         chan *Window
+	Unmap       chan *Window
+	Stroke      chan Stroke
+	NameChanged chan *Window
+	IconChanged chan *Window
 }
 
 type Window struct {
@@ -167,10 +168,11 @@ func New(config *Config) (*Wm, error) {
 		Map:           make(chan *Window),
 		Unmap:         make(chan *Window),
 		Stroke:        make(chan Stroke),
-		Change:        make(chan ChangeNotify),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
 		Atoms:         make(map[string]xproto.Atom),
+		NameChanged:   make(chan *Window),
+		IconChanged:   make(chan *Window),
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
@@ -332,27 +334,27 @@ func (w *Wm) loop() {
 					win.WriteLock(func() {
 						win.Name = strings.Join(names, "")
 					})
+					w.NameChanged <- win
 				case w.Atoms["_NET_WM_NAME"]:
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Name = strings.Join(names, "")
 					})
+					w.NameChanged <- win
 				case xproto.AtomWmIconName:
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Icon = strings.Join(names, "")
 					})
+					w.IconChanged <- win
 				case w.Atoms["_NET_WM_ICON_NAME"]:
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Icon = strings.Join(names, "")
 					})
+					w.IconChanged <- win
 				default:
 					w.pt("property notify %s %v\n", w.AtomName(ev.Atom), ev)
-				}
-				w.Change <- ChangeNotify{
-					Window: win,
-					Atom:   ev.Atom,
 				}
 
 			default:
