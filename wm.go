@@ -20,7 +20,8 @@ type Wm struct {
 	Windows       map[xproto.Window]*Window
 	CodeToSyms    [][]uint32
 	SymToCodes    map[uint32][]byte
-	Atoms         map[string]xproto.Atom
+	stringToAtom  map[string]xproto.Atom
+	atomToString  map[xproto.Atom]string
 
 	logger *log.Logger
 
@@ -176,7 +177,8 @@ func New(config *Config) (*Wm, error) {
 		Stroke:        make(chan Stroke),
 		CodeToSyms:    keycodeToKeysyms,
 		SymToCodes:    keysymToKeycodes,
-		Atoms:         make(map[string]xproto.Atom),
+		stringToAtom:  make(map[string]xproto.Atom),
+		atomToString:  make(map[xproto.Atom]string),
 		NameChanged:   make(chan *Window),
 		IconChanged:   make(chan *Window),
 		Resize:        make(chan ResizeRequest),
@@ -185,10 +187,6 @@ func New(config *Config) (*Wm, error) {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
 	} else {
 		wm.logger = config.Logger
-	}
-	// intern atoms
-	if err := wm.internAtoms(); err != nil {
-		return nil, err
 	}
 	// set supported ewmh hints
 	if err := wm.setSupported(); err != nil {
@@ -257,9 +255,9 @@ func (w *Wm) loop() {
 				transientFor := win.GetWindowIdProperty(xproto.AtomWmTransientFor)
 				win.IsTransient = transientFor != 0
 				// change WM_STATE
-				win.ChangeInt32sProperty(w.Atoms["WM_STATE"], w.Atoms["WM_STATE"], 1) // icccm NormalState
+				win.ChangeInt32sProperty(w.Atom("WM_STATE"), w.Atom("WM_STATE"), 1) // icccm NormalState
 				// get protocols
-				win.Protocols = win.GetAtomsProperty(w.Atoms["WM_PROTOCOLS"])
+				win.Protocols = win.GetAtomsProperty(w.Atom("WM_PROTOCOLS"))
 
 			case xproto.ConfigureRequestEvent:
 				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // managed and mapped window
@@ -357,7 +355,7 @@ func (w *Wm) loop() {
 						win.Name = strings.Join(names, "")
 					})
 					w.NameChanged <- win
-				case w.Atoms["_NET_WM_NAME"]:
+				case w.Atom("_NET_WM_NAME"):
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Name = strings.Join(names, "")
@@ -369,7 +367,7 @@ func (w *Wm) loop() {
 						win.Icon = strings.Join(names, "")
 					})
 					w.IconChanged <- win
-				case w.Atoms["_NET_WM_ICON_NAME"]:
+				case w.Atom("_NET_WM_ICON_NAME"):
 					names := win.GetStrsProperty(ev.Atom)
 					win.WriteLock(func() {
 						win.Icon = strings.Join(names, "")

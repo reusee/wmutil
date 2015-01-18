@@ -127,14 +127,14 @@ func (w *Window) Opposite(sibling *Window) {
 }
 
 func (w *Window) Destroy() {
-	atomDeleteWindow := w.wm.Atoms["WM_DELETE_WINDOW"]
+	atomDeleteWindow := w.wm.Atom("WM_DELETE_WINDOW")
 	for _, atom := range w.Protocols {
 		if atom == atomDeleteWindow {
 			// send message
 			msg := xproto.ClientMessageEvent{
 				Format: 32,
 				Window: w.Id,
-				Type:   w.wm.Atoms["WM_PROTOCOLS"],
+				Type:   w.wm.Atom("WM_PROTOCOLS"),
 				Data: xproto.ClientMessageDataUnionData32New([]uint32{
 					uint32(atomDeleteWindow),
 					0, 0, 0, 0, // must be 20-bytes long

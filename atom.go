@@ -1,38 +1,31 @@
 package wmutil
 
-import "github.com/BurntSushi/xgb/xproto"
+import (
+	"log"
 
-func (w *Wm) internAtoms() error {
-	atoms := []string{
-		"WM_STATE",
-		"WM_PROTOCOLS",
-		"WM_DELETE_WINDOW",
+	"github.com/BurntSushi/xgb/xproto"
+)
 
-		"_NET_SUPPORTED",
-		"_NET_WM_NAME",
-		"_NET_WM_ICON_NAME",
-		"_NET_WM_USER_TIME",
+func (w *Wm) Atom(name string) xproto.Atom {
+	if atom, ok := w.stringToAtom[name]; ok {
+		return atom
 	}
-	for _, atom := range atoms {
-		reply, err := xproto.InternAtom(w.Conn, false, uint16(len(atom)), atom).Reply()
-		if err != nil {
-			return err
-		}
-		w.Atoms[atom] = reply.Atom
+	reply, err := xproto.InternAtom(w.Conn, false, uint16(len(name)), name).Reply()
+	if err != nil {
+		log.Fatalf("atom intern error %v", err)
 	}
-	return nil
+	w.stringToAtom[name] = reply.Atom
+	return reply.Atom
 }
 
-var atomNames = make(map[xproto.Atom]string)
-
 func (w *Wm) AtomName(atom xproto.Atom) string {
-	if name, ok := atomNames[atom]; ok {
+	if name, ok := w.atomToString[atom]; ok {
 		return name
 	}
 	reply, err := xproto.GetAtomName(w.Conn, atom).Reply()
 	if err != nil {
-		w.pt("ERROR: get atom name: %v\n", err)
+		log.Fatalf("get atom name error %v", err)
 	}
-	atomNames[atom] = reply.Name
+	w.atomToString[atom] = reply.Name
 	return reply.Name
 }

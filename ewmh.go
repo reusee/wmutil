@@ -14,6 +14,6 @@ func (w *Wm) setSupported() error {
 		xgb.Put32(buf[i*4:], uint32(atom))
 	}
 	err := xproto.ChangePropertyChecked(w.Conn, xproto.PropModeReplace, w.DefaultRootId,
-		w.Atoms["_NET_SUPPORTED"], xproto.AtomAtom, 32, uint32(len(atoms)), buf).Check()
+		w.Atom("_NET_SUPPORTED"), xproto.AtomAtom, 32, uint32(len(atoms)), buf).Check()
 	return err
 }
