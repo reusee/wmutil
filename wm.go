@@ -29,6 +29,12 @@ type Wm struct {
 	Stroke      chan Stroke
 	NameChanged chan *Window
 	IconChanged chan *Window
+	Resize      chan ResizeRequest
+}
+
+type ResizeRequest struct {
+	Width, Height int
+	Window        *Window
 }
 
 type Window struct {
@@ -173,6 +179,7 @@ func New(config *Config) (*Wm, error) {
 		Atoms:         make(map[string]xproto.Atom),
 		NameChanged:   make(chan *Window),
 		IconChanged:   make(chan *Window),
+		Resize:        make(chan ResizeRequest),
 	}
 	if config.Logger == nil {
 		wm.logger = log.New(os.Stdout, "==|>", log.Lmicroseconds)
@@ -255,9 +262,9 @@ func (w *Wm) loop() {
 				win.Protocols = win.GetAtomsProperty(w.Atoms["WM_PROTOCOLS"])
 
 			case xproto.ConfigureRequestEvent:
-				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // skip managed mapped window request
+				if win, ok := w.Windows[ev.Window]; ok && win.Mapped { // managed and mapped window
 					win.ReadLock(func() {
-						notifyEv := xproto.ConfigureNotifyEvent{ // not moving or resizing
+						notifyEv := xproto.ConfigureNotifyEvent{ // not moving or resizing now
 							Event:  win.Id,
 							Window: win.Id,
 							X:      int16(win.X),
@@ -267,6 +274,21 @@ func (w *Wm) loop() {
 						}
 						xproto.SendEvent(w.Conn, false, win.Id, xproto.EventMaskStructureNotify, string(notifyEv.Bytes()))
 					})
+					// send fixed-sized window resize notify TODO
+					var width, height int
+					if xproto.ConfigWindowWidth&ev.ValueMask > 0 {
+						width = int(ev.Width)
+					}
+					if xproto.ConfigWindowHeight&ev.ValueMask > 0 {
+						height = int(ev.Height)
+					}
+					if width > 0 || height > 0 {
+						w.Resize <- ResizeRequest{
+							Width:  width,
+							Height: height,
+							Window: win,
+						}
+					}
 				} else { // configure as requested
 					var vals []uint32
 					flags := ev.ValueMask

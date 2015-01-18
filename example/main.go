@@ -116,6 +116,8 @@ func main() {
 			}
 		case <-wm.NameChanged:
 		case <-wm.IconChanged:
+		case req := <-wm.Resize:
+			pt("resize %v\n", req)
 		case <-kill:
 			return
 		}

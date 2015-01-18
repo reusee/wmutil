@@ -76,6 +76,7 @@ func TestConnect(t *testing.T) {
 			win.ReadLock(func() {
 				pt("window icon: %v\n", win.Icon)
 			})
+		case <-wm.Resize:
 		case <-testSigs:
 			return
 		}
